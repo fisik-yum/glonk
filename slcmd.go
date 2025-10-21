@@ -26,23 +26,54 @@ import (
 
 var commands = []*discordgo.ApplicationCommand{
 	{
-		Name:        "glonk_model",
+		Name:        "glonk_info",
 		Description: "list glonk model",
 	},
-	//{
-	//		Name: "glonk_setmodel",
-	//	Description: "set gl//onk model",
-	//},
+	{
+		Name:        "glonk_profile",
+		Type:        discordgo.ChatApplicationCommand,
+		Description: "set glonk prompt",
+		Options: []*discordgo.ApplicationCommandOption{
+			{
+				Type:        discordgo.ApplicationCommandOptionString,
+				Name:        "profile",
+				Required:    true,
+				Description: "change profile",
+			},
+		},
+	},
 }
 
 var commandHandlers = map[string]func(s *discordgo.Session, i *discordgo.InteractionCreate){
-	"glonk_model": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+	"glonk_info": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
 		e := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 			Type: discordgo.InteractionResponseChannelMessageWithSource,
 			Data: &discordgo.InteractionResponseData{
-				Content: fmt.Sprintf("glonk model: `%s`", glonk_model),
+				Content: fmt.Sprintf("```\nglonk model: %s\nglonk profile: %s\n```", glonk_model, profile),
 			},
 		})
 		check(e)
+	},
+	"glonk_profile": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+		p := i.ApplicationCommandData().Options[0].StringValue()
+		if _, ok := prompts[p]; ok {
+			profile = p
+			e := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+				Type: discordgo.InteractionResponseChannelMessageWithSource,
+				Data: &discordgo.InteractionResponseData{
+					Content: fmt.Sprintf("Changed profile to `%s`", p),
+				},
+			})
+			check(e)
+		} else {
+			e := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+				Type: discordgo.InteractionResponseChannelMessageWithSource,
+				Data: &discordgo.InteractionResponseData{
+					Content: "An error occured!",
+				},
+			})
+			check(e)
+		}
+
 	},
 }

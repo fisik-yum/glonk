@@ -24,9 +24,10 @@ import (
 )
 
 type owner struct {
-	BotToken     string `json:"bot_token"`
-	LLMToken     string `json:"llm_token"`
-	PromptString string `json:"prompt_string"`
+	BotToken      string            `json:"bot_token"`
+	LLMToken      string            `json:"llm_token"`
+	Prompts       map[string]string `json:"prompts"`
+	Profile string            `json:"default_profile"`
 }
 
 func read_config() { // main config file for end user
@@ -40,15 +41,19 @@ func read_config() { // main config file for end user
 	if bot_token == "" || llm_token == "" {
 		panic("A token is missing. Check config.json")
 	}
-	prompt_string = userData.PromptString
-	if prompt_string == "" {
-		panic("Prompt string can't be empty!")
+	prompts = userData.Prompts
+	if prompts == nil {
+		panic("Prompt map can't be empty!")
+	}
+	profile=userData.Profile
+	if profile== ""{
+		panic("Default prompt can't be empty!")
 	}
 }
 
 // use the *current* global `prompt_string` as a template base
 func generateFullPrompt(msg string) string {
-	return prompt_string + msg
+	return prompts[profile] + msg
 }
 
 func check(e error) {

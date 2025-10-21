@@ -30,9 +30,10 @@ import (
 
 // variables found in config.json, which needs to exist
 var (
-	bot_token     string
-	llm_token     string
-	prompt_string string
+	bot_token      string
+	llm_token      string
+	prompts        map[string]string
+	profile string
 )
 var glonk_model = "gemini-2.5-flash-lite-preview-06-17"
 
@@ -60,7 +61,6 @@ func init() {
 		log.Fatalf("glonk auth error!")
 	}
 	ctx = context.Background()
-
 }
 
 func init() {
