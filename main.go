@@ -20,6 +20,7 @@ package main
 
 import (
 	"context"
+	"flag"
 	"log"
 	"os"
 	"os/signal"
@@ -34,15 +35,18 @@ var (
 	llm_token      string
 	prompts        map[string]string
 	profile string
+	config_location string
 )
-var glonk_model = "gemini-2.5-flash-lite-preview-06-17"
+var glonk_model = "gemini-2.5-flash-lite-preview-09-2025"
 
 var s *discordgo.Session
 var c *genai.Client
 var ctx context.Context
 
 func init() {
-	_, err := os.Stat("config.json")
+	flag.StringVar(&config_location,"c","","path to configuration file")
+	flag.Parse()
+	_, err := os.Stat(config_location)
 	if os.IsNotExist(err) {
 		panic("config.json is missing")
 	}
@@ -115,7 +119,9 @@ func main() {
 				ctx,
 				glonk_model,
 				genai.Text(generateFullPrompt(m.Message.Content)),
-				nil,
+				&genai.GenerateContentConfig{
+					MaxOutputTokens: 150,
+				},
 			)
 			check(err)
 			s.ChannelMessageSendReply(m.ChannelID, result.Text(), m.Reference())
