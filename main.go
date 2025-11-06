@@ -24,6 +24,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"strings"
 
 	"github.com/bwmarrin/discordgo"
 	"google.golang.org/genai"
@@ -31,10 +32,10 @@ import (
 
 // variables found in config.json, which needs to exist
 var (
-	bot_token      string
-	llm_token      string
-	prompts        map[string]string
-	profile string
+	bot_token       string
+	llm_token       string
+	prompts         map[string]string
+	profile         string
 	config_location string
 )
 var glonk_model = "gemini-2.5-flash-lite-preview-09-2025"
@@ -44,7 +45,7 @@ var c *genai.Client
 var ctx context.Context
 
 func init() {
-	flag.StringVar(&config_location,"c","","path to configuration file")
+	flag.StringVar(&config_location, "c", "", "path to configuration file")
 	flag.Parse()
 	_, err := os.Stat(config_location)
 	if os.IsNotExist(err) {
@@ -114,11 +115,22 @@ func main() {
 		}
 
 		if IsMentioned {
+
+			parts := []*genai.Part{
+				genai.NewPartFromText(generateFullPrompt(m.Message.Content)),
+			}
+
+			for _, v := range m.Attachments {
+				if strings.HasPrefix( v.ContentType,"image") {
+					parts = append(parts, genai.NewPartFromBytes(getFile(v.URL), v.ContentType))
+				}
+			}
+
 			log.Printf("Detected prompt from user %s: %s\n", m.Author.ID, m.Message.Content)
 			result, err := c.Models.GenerateContent(
 				ctx,
 				glonk_model,
-				genai.Text(generateFullPrompt(m.Message.Content)),
+				[]*genai.Content{genai.NewContentFromParts(parts, genai.RoleUser)},
 				&genai.GenerateContentConfig{
 					MaxOutputTokens: 150,
 				},
