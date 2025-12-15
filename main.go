@@ -1,7 +1,6 @@
 /*
    glonk - glonk
    Copyright (C) 2025  fisik_yum
-
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, either version 3 of the License, or
@@ -41,8 +40,8 @@ var (
 var glonk_model = "gemini-2.5-flash-lite-preview-09-2025"
 
 var s *discordgo.Session
-var c *genai.Client
 var ctx context.Context
+var chat *genai.Chat
 
 func init() {
 	flag.StringVar(&config_location, "c", "", "path to configuration file")
@@ -52,20 +51,26 @@ func init() {
 		panic("config.json is missing")
 	}
 	read_config()
-
 	s, err = discordgo.New("Bot " + bot_token)
 	if err != nil {
 		log.Fatalf("Invalid bot parameters: %v", err)
 	}
-
-	c, err = genai.NewClient(ctx, &genai.ClientConfig{
+	ctx = context.Background()
+	client, err := genai.NewClient(ctx, &genai.ClientConfig{
 		Backend: genai.BackendGeminiAPI,
 		APIKey:  llm_token,
 	})
 	if err != nil {
 		log.Fatalf("glonk auth error!")
 	}
-	ctx = context.Background()
+
+	chat, err = client.Chats.Create(ctx, glonk_model,
+		&genai.GenerateContentConfig{
+			MaxOutputTokens: 150,
+		}, nil)
+	if err != nil {
+		log.Fatalf("glonk auth error!")
+	}
 }
 
 func init() {
@@ -116,25 +121,19 @@ func main() {
 
 		if IsMentioned {
 
-			parts := []*genai.Part{
-				genai.NewPartFromText(generateFullPrompt(m.Message.Content)),
+			parts := []genai.Part{
+				*genai.NewPartFromText(generateFullPrompt(m.Message.Content)),
 			}
 
 			for _, v := range m.Attachments {
-				if strings.HasPrefix( v.ContentType,"image") {
-					parts = append(parts, genai.NewPartFromBytes(getFile(v.URL), v.ContentType))
+				if strings.HasPrefix(v.ContentType, "image") {
+					parts = append(parts, *genai.NewPartFromBytes(getFile(v.URL), v.ContentType))
 				}
 			}
 
 			log.Printf("Detected prompt from user %s: %s\n", m.Author.ID, m.Message.Content)
-			result, err := c.Models.GenerateContent(
-				ctx,
-				glonk_model,
-				[]*genai.Content{genai.NewContentFromParts(parts, genai.RoleUser)},
-				&genai.GenerateContentConfig{
-					MaxOutputTokens: 150,
-				},
-			)
+			result, err := chat.SendMessage(
+				ctx, parts...)
 			check(err)
 			s.ChannelMessageSendReply(m.ChannelID, result.Text(), m.Reference())
 
