@@ -29,6 +29,8 @@ import (
 	"google.golang.org/genai"
 )
 
+var genconfig = &genai.GenerateContentConfig{MaxOutputTokens: 150}
+
 // variables found in config.json, which needs to exist
 var (
 	bot_token       string
@@ -41,7 +43,8 @@ var glonk_model = "gemini-2.5-flash-lite-preview-09-2025"
 
 var s *discordgo.Session
 var ctx context.Context
-var chat *genai.Chat
+var client *genai.Client
+var chats map[string]*genai.Chat
 
 func init() {
 	flag.StringVar(&config_location, "c", "", "path to configuration file")
@@ -56,21 +59,14 @@ func init() {
 		log.Fatalf("Invalid bot parameters: %v", err)
 	}
 	ctx = context.Background()
-	client, err := genai.NewClient(ctx, &genai.ClientConfig{
+	client, err = genai.NewClient(ctx, &genai.ClientConfig{
 		Backend: genai.BackendGeminiAPI,
 		APIKey:  llm_token,
 	})
 	if err != nil {
 		log.Fatalf("glonk auth error!")
 	}
-
-	chat, err = client.Chats.Create(ctx, glonk_model,
-		&genai.GenerateContentConfig{
-			MaxOutputTokens: 150,
-		}, nil)
-	if err != nil {
-		log.Fatalf("glonk auth error!")
-	}
+	chats=make(map[string]*genai.Chat)
 }
 
 func init() {
@@ -120,20 +116,26 @@ func main() {
 		}
 
 		if IsMentioned {
-
+			log.Printf("Detected prompt from user %s: %s\n", m.Author.ID, m.Message.Content)
 			parts := []genai.Part{
 				*genai.NewPartFromText(generateFullPrompt(m.Message.Content)),
 			}
-
 			for _, v := range m.Attachments {
 				if strings.HasPrefix(v.ContentType, "image") {
 					parts = append(parts, *genai.NewPartFromBytes(getFile(v.URL), v.ContentType))
 				}
 			}
-
-			log.Printf("Detected prompt from user %s: %s\n", m.Author.ID, m.Message.Content)
-			result, err := chat.SendMessage(
-				ctx, parts...)
+			guild := m.GuildID
+			chanl,_:=s.Channel(m.ChannelID)
+			if chanl.Type==discordgo.ChannelTypeDM ||chanl.Type==discordgo.ChannelTypeGroupDM{
+				guild=m.ChannelID+"_nonguild"
+			}
+			if _, ok := chats[guild]; !ok {
+				log.Printf("Creating new chat for guild %s", guild)
+				chats[guild], err = client.Chats.Create(ctx, glonk_model, genconfig, nil)
+				check(err)
+			}
+			result, err := chats[guild].SendMessage(ctx, parts...)
 			check(err)
 			s.ChannelMessageSendReply(m.ChannelID, result.Text(), m.Reference())
 
