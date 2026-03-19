@@ -63,7 +63,7 @@ func init() {
 	if err != nil {
 		log.Fatalf("glonk auth error!")
 	}
-	log.Println(cfg.Prompt)
+	//log.Println(cfg.Prompt)
 	chats = make(map[string]*genai.Chat)
 }
 
