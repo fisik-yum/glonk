@@ -23,37 +23,34 @@ import (
 	"os"
 )
 
-type owner struct {
-	BotToken      string            `json:"bot_token"`
-	LLMToken      string            `json:"llm_token"`
-	Prompts       map[string]string `json:"prompts"`
-	Profile string            `json:"default_profile"`
+type Config struct {
+	BotToken   string `json:"bot_token"`
+	LLMToken   string `json:"llm_token"`
+	Prompt     string `json:"prompt"`
+	GlonkModel string `json:"glonk_model"`
 }
 
-func read_config() { // main config file for end user
+func read_config() *Config { // main config file for end user
 	f, err := os.ReadFile("config.json")
 	check(err)
-	var userData owner
-	err = json.Unmarshal([]byte(f), &userData)
+	var cfg Config
+	err = json.Unmarshal([]byte(f), &cfg)
 	check(err)
-	bot_token = userData.BotToken
-	llm_token = userData.LLMToken
-	if bot_token == "" || llm_token == "" {
+	if cfg.BotToken == "" || cfg.LLMToken == "" {
 		panic("A token is missing. Check config.json")
 	}
-	prompts = userData.Prompts
-	if prompts == nil {
+	if cfg.Prompt == "" {
 		panic("Prompt map can't be empty!")
 	}
-	profile=userData.Profile
-	if profile== ""{
-		panic("Default prompt can't be empty!")
+	if cfg.GlonkModel == "" {
+		panic("Invalid Model")
 	}
+	return &cfg
 }
 
 // use the *current* global `prompt_string` as a template base
 func generateFullPrompt(msg string) string {
-	return prompts[profile] + msg
+	return msg
 }
 
 func check(e error) {

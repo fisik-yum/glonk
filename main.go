@@ -33,17 +33,14 @@ var genconfig = &genai.GenerateContentConfig{MaxOutputTokens: 150}
 
 // variables found in config.json, which needs to exist
 var (
-	bot_token       string
-	llm_token       string
 	prompts         map[string]string
-	profile         string
 	config_location string
 )
-var glonk_model = "gemini-2.5-flash-lite-preview-09-2025"
 
 var s *discordgo.Session
 var ctx context.Context
 var client *genai.Client
+var cfg *Config
 var chats map[string]*genai.Chat
 
 func init() {
@@ -53,28 +50,21 @@ func init() {
 	if os.IsNotExist(err) {
 		panic("config.json is missing")
 	}
-	read_config()
-	s, err = discordgo.New("Bot " + bot_token)
+	cfg = read_config()
+	s, err = discordgo.New("Bot " + cfg.BotToken)
 	if err != nil {
 		log.Fatalf("Invalid bot parameters: %v", err)
 	}
 	ctx = context.Background()
 	client, err = genai.NewClient(ctx, &genai.ClientConfig{
 		Backend: genai.BackendGeminiAPI,
-		APIKey:  llm_token,
+		APIKey:  cfg.LLMToken,
 	})
 	if err != nil {
 		log.Fatalf("glonk auth error!")
 	}
-	chats=make(map[string]*genai.Chat)
-}
-
-func init() {
-	s.AddHandler(func(s *discordgo.Session, i *discordgo.InteractionCreate) {
-		if h, ok := commandHandlers[i.ApplicationCommandData().Name]; ok {
-			h(s, i)
-		}
-	})
+	log.Println(cfg.Prompt)
+	chats = make(map[string]*genai.Chat)
 }
 
 func main() {
@@ -101,13 +91,17 @@ func main() {
 	}
 
 	log.Println("Adding glonk Handler")
+	s.AddHandler(func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+		if h, ok := commandHandlers[i.ApplicationCommandData().Name]; ok {
+			h(s, i)
+		}
+	})
 	s.AddHandler(func(s *discordgo.Session, m *discordgo.MessageCreate) {
 		if m.Author.ID == s.State.User.ID {
 			return
 		}
 
 		IsMentioned := false
-
 		for _, user := range m.Mentions {
 			if user.ID == s.State.User.ID {
 				IsMentioned = true
@@ -126,13 +120,14 @@ func main() {
 				}
 			}
 			guild := m.GuildID
-			chanl,_:=s.Channel(m.ChannelID)
-			if chanl.Type==discordgo.ChannelTypeDM ||chanl.Type==discordgo.ChannelTypeGroupDM{
-				guild=m.ChannelID+"_nonguild"
+			chanl, _ := s.Channel(m.ChannelID)
+			if chanl.Type == discordgo.ChannelTypeDM || chanl.Type == discordgo.ChannelTypeGroupDM {
+				guild = m.ChannelID + "_nonguild"
 			}
 			if _, ok := chats[guild]; !ok {
 				log.Printf("Creating new chat for guild %s", guild)
-				chats[guild], err = client.Chats.Create(ctx, glonk_model, genconfig, nil)
+				chats[guild], err = client.Chats.Create(ctx, cfg.GlonkModel, genconfig, nil)
+				chats[guild].SendMessage(ctx,*genai.NewPartFromText(cfg.Prompt))
 				check(err)
 			}
 			result, err := chats[guild].SendMessage(ctx, parts...)
